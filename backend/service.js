@@ -1,7 +1,6 @@
 const request = require('request');
 const { parseString } = require('xml2js');
 
-
 // v1 : 경도 v2 : 위도
 function dfs_xy_conv(v1, v2) {
     const RE = 6371.00877; // Earth radius (km)
@@ -57,7 +56,7 @@ function getWeather(nx, ny) {
   const serviceKey = 'wF1nqBiOKCfKIZKN2WIzmkzciFINwicZn0HarDmxpFogEIo7x2y8NM6F+W0wNDnLcWP4hRZi/tVS3P1u0kSWzA==';
   const url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst';
 
-  // 관측 시각(base_time)은 “현재 시각 – 40분” 기준
+  // 관측 시각(base_time)은 "현재 시각 - 40분" 기준
   const now = new Date(Date.now() - 40 * 60 * 1000);
   const pad = n => n < 10 ? '0' + n : n;
   const base_date = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
@@ -107,8 +106,8 @@ module.exports = {
   getWeather,
 };
 
-const { nx, ny } = dfs_xy_conv(126.978, 37.5665); // 서울시청
+/* const { nx, ny } = dfs_xy_conv(126.978, 37.5665); // 서울시청
 let result = getWeather(60, 127); // 서울시청
 result
   .then(data => console.log(data))
-  .catch(err => console.error(err));
+  .catch(err => console.error(err)); */
