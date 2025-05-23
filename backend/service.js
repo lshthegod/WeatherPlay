@@ -1,5 +1,6 @@
 const request = require('request');
 const { parseString } = require('xml2js');
+const dotenv = require('dotenv');
 
 // v1 : 경도 v2 : 위도
 function dfs_xy_conv(v1, v2) {
@@ -106,8 +107,47 @@ module.exports = {
   getWeather,
 };
 
-/* const { nx, ny } = dfs_xy_conv(126.978, 37.5665); // 서울시청
-let result = getWeather(60, 127); // 서울시청
-result
-  .then(data => console.log(data))
-  .catch(err => console.error(err)); */
+function getSongs(weather) {
+  dotenv.config();
+  const API_KEY = process.env.api_key;
+  const url = `http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag=${weather}&api_key=${API_KEY}&format=json`;
+  return new Promise((resolve, reject) => {
+    request(url, { method: 'GET' }, (err, res, body) => {
+      if (err) return reject(err);
+      if (res.statusCode !== 200)
+        return reject(new Error(`API Error: ${res.statusCode}`));
+      
+      try {
+        const data = JSON.parse(body);
+        resolve(data);
+      } catch (e) {
+        reject(new Error(`Failed to parse JSON: ${e.message}`));
+      }
+    });
+  });
+}
+
+function getSong(songs) {
+  const tracks = songs.tracks.track;
+  const randomIndex = Math.floor(Math.random() * tracks.length); // 0~49
+  const track = tracks[randomIndex];
+
+  return {
+    name: track.name,
+    artist: track.artist.name
+  };
+}
+
+async function main() {
+  // 날씨 테스트
+  const { nx, ny } = dfs_xy_conv(126.978, 37.5665);
+  const weatherData = await getWeather(nx, ny);
+  console.log(weatherData);
+
+  // 음악 테스트
+  const data = await getSongs("cloudy");
+  const song = getSong(data);
+  console.log(song);
+}
+
+main();
