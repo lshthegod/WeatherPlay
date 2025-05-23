@@ -1,6 +1,7 @@
 const request = require('request');
 const { parseString } = require('xml2js');
 const dotenv = require('dotenv');
+const axios = require('axios');
 
 // v1 : 경도 v2 : 위도
 function dfs_xy_conv(v1, v2) {
@@ -109,8 +110,8 @@ module.exports = {
 
 function getSongs(weather) {
   dotenv.config();
-  const API_KEY = process.env.api_key;
-  const url = `http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag=${weather}&api_key=${API_KEY}&format=json`;
+  const api_key = process.env.API_KEY;
+  const url = `http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag=${weather}&api_key=${api_key}&format=json`;
   return new Promise((resolve, reject) => {
     request(url, { method: 'GET' }, (err, res, body) => {
       if (err) return reject(err);
@@ -138,7 +139,22 @@ function getSong(songs) {
   };
 }
 
+async function getAccessToken() {
+  const tokenUrl = 'https://accounts.spotify.com/api/token';
+  const authString = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64');
+
+  const res = await axios.post(tokenUrl, 'grant_type=client_credentials', {
+    headers: {
+      Authorization: `Basic ${authString}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+
+  return res.data.access_token;
+}
+
 async function main() {
+
   // 날씨 테스트
   const { nx, ny } = dfs_xy_conv(126.978, 37.5665);
   const weatherData = await getWeather(nx, ny);
@@ -148,6 +164,10 @@ async function main() {
   const data = await getSongs("cloudy");
   const song = getSong(data);
   console.log(song);
+
+  // spotify access token
+  const token = await getAccessToken();
+  console.log(token);
 }
 
 main();
