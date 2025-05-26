@@ -103,15 +103,54 @@ function getWeather(nx, ny) {
   });
 }
 
-module.exports = {
-  dfs_xy_conv,
-  getWeather,
-};
+function getWeatherMood(weatherData) {
+  const { RN1, SKY } = weatherData;
+  const hour = new Date().getHours();
+
+  // 시간대 처리
+  const isDawn = hour >= 0 && hour < 6;
+  const isMorning = hour >= 6 && hour < 12;
+  const isAfternoon = hour >= 12 && hour < 18;
+  const isEvening = hour >= 18 && hour < 20;
+  const isNight = hour >= 20 || hour < 6;
+
+  let timeMood = '';
+  if (isDawn) timeMood = 'dawn';
+  else if (isMorning) timeMood = 'morning';
+  else if (isAfternoon) timeMood = 'afternoon';
+  else if (isEvening) timeMood = 'evening';
+  else if (isNight) timeMood = 'night';
+
+  // rainMood 계산
+  let rainMood = null;
+  if (typeof RN1 === 'string' && RN1.includes('없음')) {
+    rainMood = null;
+  } else if (RN1 === '0.0 mm') {
+    rainMood = null;
+  } else {
+    const rainAmount = parseFloat(RN1);
+    if (rainAmount >= 30.0) rainMood = 'stormy';
+    else if (rainAmount >= 4.0) rainMood = 'rainy';
+    else rainMood = null;
+  }
+
+  // skyMood 계산
+  let skyMood = null;
+  const skyVal = parseInt(SKY);
+  if (skyVal >= 0 && skyVal <= 5) skyMood = 'clear';
+  else if (skyVal >= 6 && skyVal <= 8) skyMood = 'cloudy';
+  else if (skyVal >= 9 && skyVal <= 10) skyMood = 'overcast';
+
+  // 최종 반환 조건
+  if (rainMood) return rainMood;
+  if (skyMood === 'clear') return timeMood;
+  return skyMood;
+}
 
 function getSongs(weather) {
   dotenv.config();
   const api_key = process.env.API_KEY;
-  const url = `http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag=${weather}&api_key=${api_key}&format=json`;
+  const url = `http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag=${weather}&limit=100&api_key=${api_key}&format=json`;
   return new Promise((resolve, reject) => {
     request(url, { method: 'GET' }, (err, res, body) => {
       if (err) return reject(err);
@@ -128,15 +167,20 @@ function getSongs(weather) {
   });
 }
 
-function getSong(songs) {
-  const tracks = songs.tracks.track;
-  const randomIndex = Math.floor(Math.random() * tracks.length); // 0~49
-  const track = tracks[randomIndex];
+function songsInfo(songs, count = 20) {
+  const tracks = [...songs.tracks.track];
 
-  return {
+  // Fisher–Yates shuffle
+  for (let i = tracks.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tracks[i], tracks[j]] = [tracks[j], tracks[i]];
+  }
+
+  // 앞에서 count개만 추출
+  return tracks.slice(0, count).map(track => ({
     name: track.name,
     artist: track.artist.name
-  };
+  }));
 }
 
 async function getAccessToken() {
@@ -153,21 +197,81 @@ async function getAccessToken() {
   return res.data.access_token;
 }
 
+async function getTrackId(songInfo) {
+  const query = `track:${songInfo.name} artist:${songInfo.artist}`;
+  const encodedQuery = encodeURIComponent(query);
+  const accessToken = await getAccessToken();
+  const url = `https://api.spotify.com/v1/search?q=${encodedQuery}&type=track&limit=1`;
+
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    const items = response.data.tracks.items;
+    if (items.length > 0) {
+      return items[0].id;
+    } else {
+      throw new Error('No track found');
+    }
+  } catch (error) {
+    console.error('Error fetching track ID:', error.message);
+    throw error;
+  }
+}
+
+async function getTrackIds(songs) {
+  const selectedSongs = songsInfo(songs, 20); // 20곡 추출
+
+  const ids = [];
+  for (const song of selectedSongs) {
+    try {
+      const id = await getTrackId(song); // 각 곡에 대해 ID 비동기 요청
+      ids.push(id);
+    } catch (err) {
+      console.error(`ID 가져오기 실패: ${song.name} by ${song.artist}`, err);
+    }
+  }
+
+  return ids;
+}
+
 async function main() {
 
   // 날씨 테스트
   const { nx, ny } = dfs_xy_conv(126.978, 37.5665);
   const weatherData = await getWeather(nx, ny);
   console.log(weatherData);
+  const weather = getWeatherMood(weatherData);
+  console.log(weather);
 
   // 음악 테스트
-  const data = await getSongs("cloudy");
-  const song = getSong(data);
-  console.log(song);
+  const data = await getSongs(weather);
+  const songs = songsInfo(data);
+  console.log(songs);
 
   // spotify access token
   const token = await getAccessToken();
   console.log(token);
+
+  // ID 테스트
+  const ID = await getTrackId(songs[0]);
+  console.log(`https://open.spotify.com/track/${ID}`);
+
+  const IDs = await getTrackIds(data);
+  console.log(IDs);
 }
 
 main();
+
+
+module.exports = {
+  dfs_xy_conv,
+  getWeather,
+  getWeatherMood,
+  getSongs,
+  songsInfo,
+  getTrackId
+};
