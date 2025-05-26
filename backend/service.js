@@ -222,25 +222,31 @@ async function getTrackId(songInfo) {
   }
 }
 
-async function getTrackIds(songs) {
-  const selectedSongs = songsInfo(songs, 20); // 20곡 추출
-
+async function getTrackIds(selectedSongs) {
   const ids = [];
   for (const song of selectedSongs) {
     try {
-      const id = await getTrackId(song); // 각 곡에 대해 ID 비동기 요청
+      const id = await getTrackId(song);
       ids.push(id);
     } catch (err) {
-      console.error(`ID 가져오기 실패: ${song.name} by ${song.artist}`, err);
+      console.error(`ID 가져오기 실패: ${song.name} by ${song.artist}`);
     }
   }
 
   return ids;
 }
 
-async function main() {
+async function mainService(x = 126.978, y = 37.5665) {
+  const { nx, ny } = dfs_xy_conv(x, y);
+  const weatherData = await getWeather(nx, ny);
+  const weather = getWeatherMood(weatherData);
+  const data = await getSongs(weather);
+  const songs = songsInfo(data);
+  const IDs = await getTrackIds(songs);
+  console.log("IDs 가져오기 성공");
+  return IDs
 
-  // 날씨 테스트
+/*   // 날씨 테스트
   const { nx, ny } = dfs_xy_conv(126.978, 37.5665);
   const weatherData = await getWeather(nx, ny);
   console.log(weatherData);
@@ -261,17 +267,12 @@ async function main() {
   console.log(`https://open.spotify.com/track/${ID}`);
 
   const IDs = await getTrackIds(data);
-  console.log(IDs);
+  console.log(IDs); */
 }
 
-main();
+// mainService();
 
 
 module.exports = {
-  dfs_xy_conv,
-  getWeather,
-  getWeatherMood,
-  getSongs,
-  songsInfo,
-  getTrackId
+  mainService
 };

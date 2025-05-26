@@ -1,22 +1,22 @@
-const { getWeather, dfs_xy_conv } = require('./service');
+const { mainService } = require('./service');
 
-function weatherController(req, res) {
+async function mainController(req, res) {
     try {
-        const { latitude, longitude } = req.body;
-        if (!latitude || !longitude) {
-            return res.status(400).json({ error: '위도 또는 경도 값이 없습니다.' });
+        const { longitude, latitude } = req.body;
+        if (!longitude || !latitude) {
+            console.error('위도 또는 경도 값이 없습니다. default 위도 및 경로로 대체합니다.');
+            const result = await mainService();
+            return res.status(200).json(result);
         }
-        const { nx, ny } = dfs_xy_conv(longitude, latitude);
-        getWeather(nx, ny)
-            // 일단은 데이터 출력, 이후의 로직에 맞춰 수정 필요
-            .then(data => console.log(data))
-            .catch(err => console.error(err));
+        const result = await mainService(longitude, latitude);
+        return res.status(200).json(result);
     } catch (error) {
-        console.error('날씨 API 호출 실패:', error.message);
-        res.status(500).json({ error: '날씨 정보 조회 실패' });
+        console.error('날씨 API 호출 실패하였습니다. default 위도 및 경로로 대체합니다.');
+        const result = await mainService();
+        return res.status(200).json(result);
     }
 }
 
 module.exports = {
-  weatherController
+    mainController
 }
