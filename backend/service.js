@@ -147,6 +147,11 @@ function getWeatherMood(weatherData) {
   return skyMood;
 }
 
+function getTemperature(weatherData) {
+  const temp = Number(weatherData.T1H);
+  return { Temperature: temp };
+}
+
 function getSongs(weather) {
   dotenv.config();
   const api_key = process.env.API_KEY;
@@ -239,12 +244,13 @@ async function getTrackIds(selectedSongs) {
 async function mainService(x = 126.978, y = 37.5665) {
   const { nx, ny } = dfs_xy_conv(x, y);
   const weatherData = await getWeather(nx, ny);
+  const temp = getTemperature(weatherData);
   const weather = getWeatherMood(weatherData);
   const data = await getSongs(weather);
   const songs = songsInfo(data);
   const IDs = await getTrackIds(songs);
   console.log("IDs 가져오기 성공");
-  return IDs
+  return { temp, IDs }
 
 /*   // 날씨 테스트
   const { nx, ny } = dfs_xy_conv(126.978, 37.5665);
