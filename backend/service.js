@@ -195,9 +195,9 @@ async function getAccessToken() {
     `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
   ).toString("base64");
 
-  console.log("SPOTIFY_CLIENT_ID:", process.env.SPOTIFY_CLIENT_ID);
-  console.log("SPOTIFY_CLIENT_SECRET:", process.env.SPOTIFY_CLIENT_SECRET);
-  console.log("API_KEY:", process.env.API_KEY);
+  // console.log("SPOTIFY_CLIENT_ID:", process.env.SPOTIFY_CLIENT_ID);
+  // console.log("SPOTIFY_CLIENT_SECRET:", process.env.SPOTIFY_CLIENT_SECRET);
+  // console.log("API_KEY:", process.env.API_KEY);
 
   const res = await axios.post(tokenUrl, "grant_type=client_credentials", {
     headers: {
