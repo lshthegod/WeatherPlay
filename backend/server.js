@@ -5,9 +5,6 @@ const app = express();
 const port = process.env.PORT || 3000;
 const path = require("path");
 
-// 정적 파일 제공 (HTML, CSS, JS 파일들)
-app.use(express.static(__dirname + "/frontend")); // 절대 경로로 설정
-
 // JSON 파싱을 위한 미들웨어
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
