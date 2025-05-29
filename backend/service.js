@@ -1,53 +1,55 @@
-const request = require('request');
-const { parseString } = require('xml2js');
-const dotenv = require('dotenv');
-const axios = require('axios');
+const request = require("request");
+const { parseString } = require("xml2js");
+const dotenv = require("dotenv");
+const axios = require("axios");
 
 // v1 : 경도 v2 : 위도
 function dfs_xy_conv(v1, v2) {
-    const RE = 6371.00877; // Earth radius (km)
-    const GRID = 5.0; // Grid spacing (km)
-    const SLAT1 = 30.0; // 1st standard parallel
-    const SLAT2 = 60.0; // 2nd standard parallel
-    const OLON = 126.0; // origin longitude
-    const OLAT = 38.0; // origin latitude
-    const XO = 210 / GRID; // origin X grid coordinate
-    const YO = 675 / GRID; // origin Y grid coordinate
+  const RE = 6371.00877; // Earth radius (km)
+  const GRID = 5.0; // Grid spacing (km)
+  const SLAT1 = 30.0; // 1st standard parallel
+  const SLAT2 = 60.0; // 2nd standard parallel
+  const OLON = 126.0; // origin longitude
+  const OLAT = 38.0; // origin latitude
+  const XO = 210 / GRID; // origin X grid coordinate
+  const YO = 675 / GRID; // origin Y grid coordinate
 
-    const DEGRAD = Math.PI / 180.0;
-    const RADDEG = 180.0 / Math.PI;
+  const DEGRAD = Math.PI / 180.0;
+  const RADDEG = 180.0 / Math.PI;
 
-    let re = RE / GRID;
-    let slat1 = SLAT1 * DEGRAD;
-    let slat2 = SLAT2 * DEGRAD;
-    let olon = OLON * DEGRAD;
-    let olat = OLAT * DEGRAD;
+  let re = RE / GRID;
+  let slat1 = SLAT1 * DEGRAD;
+  let slat2 = SLAT2 * DEGRAD;
+  let olon = OLON * DEGRAD;
+  let olat = OLAT * DEGRAD;
 
-    let sn = Math.tan(Math.PI * 0.25 + slat2 * 0.5) / Math.tan(Math.PI * 0.25 + slat1 * 0.5);
-    sn = Math.log(Math.cos(slat1) / Math.cos(slat2)) / Math.log(sn);
+  let sn =
+    Math.tan(Math.PI * 0.25 + slat2 * 0.5) /
+    Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+  sn = Math.log(Math.cos(slat1) / Math.cos(slat2)) / Math.log(sn);
 
-    let sf = Math.tan(Math.PI * 0.25 + slat1 * 0.5);
-    sf = Math.pow(sf, sn) * Math.cos(slat1) / sn;
+  let sf = Math.tan(Math.PI * 0.25 + slat1 * 0.5);
+  sf = (Math.pow(sf, sn) * Math.cos(slat1)) / sn;
 
-    let ro = Math.tan(Math.PI * 0.25 + olat * 0.5);
-    ro = re * sf / Math.pow(ro, sn);
+  let ro = Math.tan(Math.PI * 0.25 + olat * 0.5);
+  ro = (re * sf) / Math.pow(ro, sn);
 
-    const lat = v2;
-    const lon = v1;
-    let ra = Math.tan(Math.PI * 0.25 + (lat) * DEGRAD * 0.5);
-    ra = re * sf / Math.pow(ra, sn);
-    let theta = lon * DEGRAD - olon;
-    if (theta > Math.PI) theta -= 2.0 * Math.PI;
-    if (theta < -Math.PI) theta += 2.0 * Math.PI;
-    theta *= sn;
+  const lat = v2;
+  const lon = v1;
+  let ra = Math.tan(Math.PI * 0.25 + lat * DEGRAD * 0.5);
+  ra = (re * sf) / Math.pow(ra, sn);
+  let theta = lon * DEGRAD - olon;
+  if (theta > Math.PI) theta -= 2.0 * Math.PI;
+  if (theta < -Math.PI) theta += 2.0 * Math.PI;
+  theta *= sn;
 
-    let x = ra * Math.sin(theta) + XO + 1.5;
-    let y = ro - ra * Math.cos(theta) + YO + 1.5;
+  let x = ra * Math.sin(theta) + XO + 1.5;
+  let y = ro - ra * Math.cos(theta) + YO + 1.5;
 
-    return {
-        nx: Math.floor(x),
-        ny: Math.floor(y)
-    };
+  return {
+    nx: Math.floor(x),
+    ny: Math.floor(y),
+  };
 }
 
 /**
@@ -55,31 +57,35 @@ function dfs_xy_conv(v1, v2) {
  * 객체를 resolve 하는 Promise 반환
  */
 function getWeather(nx, ny) {
-  const serviceKey = 'wF1nqBiOKCfKIZKN2WIzmkzciFINwicZn0HarDmxpFogEIo7x2y8NM6F+W0wNDnLcWP4hRZi/tVS3P1u0kSWzA==';
-  const url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst';
+  const serviceKey =
+    "wF1nqBiOKCfKIZKN2WIzmkzciFINwicZn0HarDmxpFogEIo7x2y8NM6F+W0wNDnLcWP4hRZi/tVS3P1u0kSWzA==";
+  const url =
+    "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst";
 
   // 관측 시각(base_time)은 "현재 시각 - 40분" 기준
   const now = new Date(Date.now() - 40 * 60 * 1000);
-  const pad = n => n < 10 ? '0' + n : n;
-  const base_date = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
+  const pad = (n) => (n < 10 ? "0" + n : n);
+  const base_date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(
+    now.getDate()
+  )}`;
   const base_time = `${pad(now.getHours())}00`;
 
   // 쿼리스트링 조합
   const qs = [
     `serviceKey=${encodeURIComponent(serviceKey)}`,
-    'pageNo=1',
-    'numOfRows=1000',
-    'dataType=XML',
+    "pageNo=1",
+    "numOfRows=1000",
+    "dataType=XML",
     `base_date=${base_date}`,
     `base_time=${base_time}`,
     `nx=${nx}`,
-    `ny=${ny}`
-  ].join('&');
+    `ny=${ny}`,
+  ].join("&");
 
   return new Promise((resolve, reject) => {
-    request(`${url}?${qs}`, { method: 'GET' }, (err, res, body) => {
+    request(`${url}?${qs}`, { method: "GET" }, (err, res, body) => {
       if (err) return reject(err);
-      if (res.statusCode !== 200) 
+      if (res.statusCode !== 200)
         return reject(new Error(`API 에러: ${res.statusCode}`));
 
       // XML → JS 객체 파싱
@@ -91,7 +97,7 @@ function getWeather(nx, ny) {
         const arr = Array.isArray(items) ? items : [items];
         // category: obsrValue 맵 생성
         const result = {};
-        arr.forEach(i => {
+        arr.forEach((i) => {
           if (i.category && i.fcstValue != null) {
             result[i.category] = i.fcstValue;
           }
@@ -114,42 +120,37 @@ function getWeatherMood(weatherData) {
   const isEvening = hour >= 18 && hour < 20;
   const isNight = hour >= 20 || hour < 6;
 
-  let timeMood = '';
-  if (isDawn) timeMood = 'dawn';
-  else if (isMorning) timeMood = 'morning';
-  else if (isAfternoon) timeMood = 'afternoon';
-  else if (isEvening) timeMood = 'evening';
-  else if (isNight) timeMood = 'night';
+  let timeMood = "";
+  if (isDawn) timeMood = "dawn";
+  else if (isMorning) timeMood = "morning";
+  else if (isAfternoon) timeMood = "afternoon";
+  else if (isEvening) timeMood = "evening";
+  else if (isNight) timeMood = "night";
 
   // rainMood 계산
   let rainMood = null;
-  if (typeof RN1 === 'string' && RN1.includes('없음')) {
+  if (typeof RN1 === "string" && RN1.includes("없음")) {
     rainMood = null;
-  } else if (RN1 === '0.0 mm') {
+  } else if (RN1 === "0.0 mm") {
     rainMood = null;
   } else {
     const rainAmount = parseFloat(RN1);
-    if (rainAmount >= 30.0) rainMood = 'stormy';
-    else if (rainAmount >= 4.0) rainMood = 'rainy';
+    if (rainAmount >= 30.0) rainMood = "stormy";
+    else if (rainAmount >= 4.0) rainMood = "rainy";
     else rainMood = null;
   }
 
   // skyMood 계산
   let skyMood = null;
   const skyVal = parseInt(SKY);
-  if (skyVal >= 0 && skyVal <= 5) skyMood = 'clear';
-  else if (skyVal >= 6 && skyVal <= 8) skyMood = 'cloudy';
-  else if (skyVal >= 9 && skyVal <= 10) skyMood = 'overcast';
+  if (skyVal >= 0 && skyVal <= 5) skyMood = "clear";
+  else if (skyVal >= 6 && skyVal <= 8) skyMood = "cloudy";
+  else if (skyVal >= 9 && skyVal <= 10) skyMood = "overcast";
 
   // 최종 반환 조건
   if (rainMood) return rainMood;
-  if (skyMood === 'clear') return timeMood;
+  if (skyMood === "clear") return timeMood;
   return skyMood;
-}
-
-function getTemperature(weatherData) {
-  const temp = Number(weatherData.T1H);
-  return { Temperature: temp };
 }
 
 function getSongs(weather) {
@@ -157,11 +158,11 @@ function getSongs(weather) {
   const api_key = process.env.API_KEY;
   const url = `http://ws.audioscrobbler.com/2.0/?method=tag.gettoptracks&tag=${weather}&limit=100&api_key=${api_key}&format=json`;
   return new Promise((resolve, reject) => {
-    request(url, { method: 'GET' }, (err, res, body) => {
+    request(url, { method: "GET" }, (err, res, body) => {
       if (err) return reject(err);
       if (res.statusCode !== 200)
         return reject(new Error(`API Error: ${res.statusCode}`));
-      
+
       try {
         const data = JSON.parse(body);
         resolve(data);
@@ -182,21 +183,27 @@ function songsInfo(songs, count = 20) {
   }
 
   // 앞에서 count개만 추출
-  return tracks.slice(0, count).map(track => ({
+  return tracks.slice(0, count).map((track) => ({
     name: track.name,
-    artist: track.artist.name
+    artist: track.artist.name,
   }));
 }
 
 async function getAccessToken() {
-  const tokenUrl = 'https://accounts.spotify.com/api/token';
-  const authString = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64');
+  const tokenUrl = "https://accounts.spotify.com/api/token";
+  const authString = Buffer.from(
+    `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
+  ).toString("base64");
 
-  const res = await axios.post(tokenUrl, 'grant_type=client_credentials', {
+  console.log("SPOTIFY_CLIENT_ID:", process.env.SPOTIFY_CLIENT_ID);
+  console.log("SPOTIFY_CLIENT_SECRET:", process.env.SPOTIFY_CLIENT_SECRET);
+  console.log("API_KEY:", process.env.API_KEY);
+
+  const res = await axios.post(tokenUrl, "grant_type=client_credentials", {
     headers: {
       Authorization: `Basic ${authString}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
   });
 
   return res.data.access_token;
@@ -219,10 +226,10 @@ async function getTrackId(songInfo) {
     if (items.length > 0) {
       return items[0].id;
     } else {
-      throw new Error('No track found');
+      throw new Error("No track found");
     }
   } catch (error) {
-    console.error('Error fetching track ID:', error.message);
+    console.error("Error fetching track ID:", error.message);
     throw error;
   }
 }
@@ -244,15 +251,14 @@ async function getTrackIds(selectedSongs) {
 async function mainService(x = 126.978, y = 37.5665) {
   const { nx, ny } = dfs_xy_conv(x, y);
   const weatherData = await getWeather(nx, ny);
-  const temp = getTemperature(weatherData);
   const weather = getWeatherMood(weatherData);
   const data = await getSongs(weather);
   const songs = songsInfo(data);
   const IDs = await getTrackIds(songs);
   console.log("IDs 가져오기 성공");
-  return { temp, IDs }
+  return IDs;
 
-/*   // 날씨 테스트
+  /*   // 날씨 테스트
   const { nx, ny } = dfs_xy_conv(126.978, 37.5665);
   const weatherData = await getWeather(nx, ny);
   console.log(weatherData);
@@ -278,7 +284,6 @@ async function mainService(x = 126.978, y = 37.5665) {
 
 // mainService();
 
-
 module.exports = {
-  mainService
+  mainService,
 };
