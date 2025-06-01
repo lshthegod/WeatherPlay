@@ -2,6 +2,7 @@ const request = require("request");
 const { parseString } = require("xml2js");
 const dotenv = require("dotenv");
 const axios = require("axios");
+const querystring = require("querystring");
 
 // v1 : 경도 v2 : 위도
 function dfs_xy_conv(v1, v2) {
@@ -210,7 +211,7 @@ async function getAccessToken() {
 }
 
 async function getTrackId(songInfo) {
-  const query = `track:${songInfo.name} artist:${songInfo.artist}`;
+  const query = `${songInfo.name} ${songInfo.artist}`;
   const encodedQuery = encodeURIComponent(query);
   const accessToken = await getAccessToken();
   const url = `https://api.spotify.com/v1/search?q=${encodedQuery}&type=track&limit=1`;
@@ -256,7 +257,13 @@ async function mainService(x = 126.978, y = 37.5665) {
   const songs = songsInfo(data);
   const IDs = await getTrackIds(songs);
   console.log("IDs 가져오기 성공");
-  return IDs;
+  // songs와 IDs를 합쳐서 [{id, name, artist}] 형태로 반환
+  const result = IDs.map((id, idx) => ({
+    id,
+    name: songs[idx]?.name || '',
+    artist: songs[idx]?.artist || ''
+  }));
+  return result;
 
   /*   // 날씨 테스트
   const { nx, ny } = dfs_xy_conv(126.978, 37.5665);

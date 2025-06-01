@@ -3,6 +3,7 @@ const { mainService } = require("./service");
 const { mainController } = require("./controller");
 const axios = require("axios");
 const router = express.Router();
+const querystring = require("querystring");
 
 // POST 엔드포인트 - 위치 정보와 함께 곡 요청
 router.post("/songs", mainController);
@@ -16,6 +17,60 @@ router.get("/songs", async (req, res) => {
   } catch (error) {
     console.error("Error fetching songs:", error);
     res.status(500).json({ error: "Failed to fetch songs" });
+  }
+});
+
+// Spotify login redirection endpoint
+router.get("/login", (req, res) => {
+  const redirect_uri = process.env.REDIRECT_URI;
+  console.log("redirect_uri 확인:", redirect_uri);
+  
+  const params = querystring.stringify({
+    response_type: "code",
+    client_id: process.env.SPOTIFY_CLIENT_ID,
+    scope: "user-read-private user-read-email streaming",
+    redirect_uri,
+  });
+
+  const spotifyAuthUrl = `https://accounts.spotify.com/authorize?${params}`;
+  res.redirect(spotifyAuthUrl);
+});
+
+router.get("/callback", async (req, res) => {
+  const code = req.query.code;
+  const redirect_uri = process.env.REDIRECT_URI;
+
+  if (!code) {
+    return res.send("로그인 실패: code 없음");
+  }
+
+  try {
+    const tokenResponse = await axios.post(
+      "https://accounts.spotify.com/api/token",
+      querystring.stringify({
+        grant_type: "authorization_code",
+        code: code,
+        redirect_uri: redirect_uri,
+      }),
+      {
+        headers: {
+          Authorization:
+            "Basic " +
+            Buffer.from(
+              process.env.SPOTIFY_CLIENT_ID +
+                ":" +
+                process.env.SPOTIFY_CLIENT_SECRET
+            ).toString("base64"),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    const { access_token, refresh_token } = tokenResponse.data;
+    res.redirect(`/?access_token=${access_token}`);
+  } catch (error) {
+    console.error("토큰 요청 실패:", error.response?.data || error.message);
+    res.send("로그인 실패: 토큰 요청 실패");
   }
 });
 
