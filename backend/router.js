@@ -6,14 +6,28 @@ const router = express.Router();
 const querystring = require("querystring");
 
 // POST 엔드포인트 - 위치 정보와 함께 곡 요청
-router.post("/songs", mainController);
+router.post("/songs", async (req, res) => {
+  try {
+    console.log("=== POST /songs 호출 (위치 정보 사용) ===");
+    const { latitude, longitude } = req.body;
+    // mainService는 { weather, songs } 형태의 객체를 반환
+    const result = await mainService(longitude, latitude); // 경도, 위도 순서로 전달
+    // 곡 목록만 추출하여 응답
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching songs with location:", error);
+    res.status(500).json({ error: "Failed to fetch songs with location" });
+  }
+});
 
 // GET 엔드포인트 - 기본 위치로 곡 요청 (fallback)
 router.get("/songs", async (req, res) => {
   try {
     console.log("=== GET /songs 호출 (기본 위치 사용) ===");
-    const songs = await mainService(); // 기본 위치 (서울) 사용
-    res.status(200).json(songs);
+    // mainService는 { weather, songs } 형태의 객체를 반환
+    const result = await mainService(); // 기본 위치 (서울) 사용
+     // 곡 목록만 추출하여 응답
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error fetching songs:", error);
     res.status(500).json({ error: "Failed to fetch songs" });
