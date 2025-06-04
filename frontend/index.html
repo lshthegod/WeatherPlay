@@ -346,9 +346,11 @@
         }
 
         .volume-value {
-            color: #886364;
-            font-size: 12px;
-            min-width: 35px;
+            color: #181111;
+            font-size: 14px;
+            font-weight: normal;
+            line-height: 1.5;
+            min-width: 40px;
             text-align: right;
         }
 
@@ -394,16 +396,24 @@
 
         .status {
             position: fixed;
-            top: 16px;
-            left: 16px;
-            background: rgba(0, 0, 0, 0.7);
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
+            padding: 10px 20px;
+            border-radius: 25px;
             z-index: 1000;
-            backdrop-filter: blur(10px);
-            font-weight: 500;
+            font-size: 14px;
+            text-align: center;
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .status.hidden {
+            opacity: 0;
+            pointer-events: none;
         }
 
         .loading {
@@ -432,6 +442,37 @@
             width: 20px;
             height: 20px;
             fill: currentColor;
+        }
+
+        #songList {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        #songList div {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            color: #181111;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        #songList div:last-child {
+            border-bottom: none;
+        }
+
+        #songList a {
+            color: #1DB954;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        #songList a:hover {
+            text-decoration: underline;
         }
 
         @media (max-width: 380px) {

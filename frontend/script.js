@@ -130,6 +130,31 @@ function updatePlayerState(state) {
   // 셔플/반복 상태 업데이트
   elements.shuffleBtn.classList.toggle('active', state.shuffle);
   elements.repeatBtn.classList.toggle('active', state.repeat_mode > 0);
+
+  // 플레이리스트에서 현재 재생 중인 곡 표시
+  const songListDiv = document.getElementById('songList');
+  if (songListDiv && state && state.track_window && state.track_window.current_track) {
+    const currentTrackId = state.track_window.current_track.id;
+    // 이전에 활성화된 항목의 스타일 제거
+    songListDiv.querySelectorAll('div').forEach(item => {
+      item.classList.remove('current-track');
+    });
+    // 현재 트랙 ID와 일치하는 항목에 스타일 추가
+    // a 태그의 href에서 track ID를 추출하여 비교
+    const currentItem = Array.from(songListDiv.querySelectorAll('div a')).find(link => {
+      const href = link.getAttribute('href');
+      return href && href.includes(`/track/${currentTrackId}`);
+    });
+    if (currentItem) {
+      currentItem.parentElement.classList.add('current-track');
+
+      // 현재 재생 중인 곡의 제목과 아티스트로 플레이리스트 항목 텍스트 업데이트
+      const spotifyTrack = state.track_window.current_track;
+      if (spotifyTrack) {
+         currentItem.textContent = `${currentItem.parentElement.textContent.split(':')[0]}: ${spotifyTrack.name} - ${spotifyTrack.artists.map(a => a.name).join(', ')}`;
+      }
+    }
+  }
 }
 
 // 7. 진행 바 실시간 업데이트
@@ -179,6 +204,10 @@ if (window.location.pathname === "/" || window.location.pathname === "/index.htm
     });
     player.addListener('player_state_changed', (state) => {
       console.log('[Player] state_changed:', state);
+      if (state && state.track_window) {
+        console.log('[Player] 현재 트랙:', state.track_window.current_track);
+        console.log('[Player] 트랙 목록:', state.track_window.track_list);
+      }
       updatePlayerState(state);
     });
     player.addListener('initialization_error', ({ message }) => {
@@ -249,34 +278,44 @@ if (window.location.pathname === "/" || window.location.pathname === "/index.htm
       const originalHTML = elements.loadSongs.innerHTML;
       elements.loadSongs.innerHTML = '<div class="loading"></div>';
       elements.loadSongs.disabled = true;
+      const songListDiv = document.getElementById('songList');
+      songListDiv.innerHTML = ''; // Clear previous list on load attempt
+
       try {
-        const location = await getCurrentLocation();
-        const songs = await fetchSongsWithLocation(location);
-        const songListDiv = document.getElementById('songList');
+        let songs;
+        try {
+          const location = await getCurrentLocation();
+          elements.status.textContent = '위치 기반 곡 불러오는 중... 🎵';
+          songs = await fetchSongsWithLocation(location);
+        } catch (locationError) {
+          console.warn('[Player] 위치 정보 가져오기 실패, 기본 위치 사용:', locationError);
+          elements.status.textContent = '기본 위치로 곡 불러오는 중... 🎵';
+          songs = await fetchSongs();
+        }
+
         if (songs && songs.length > 0) {
           elements.status.textContent = `${songs.length}곡이 추가되었습니다!`;
+          console.log('[loadSongs] 받아온 노래 목록:', songs);
           if (songListDiv) {
             songListDiv.innerHTML = songs.map((song, idx) =>
               `<div>곡 ${idx + 1}: <a href='https://open.spotify.com/track/${song.id}' target='_blank'>${song.name} - ${song.artist}</a></div>`
             ).join('');
           }
-          await playSongs(songs.map(song => song.id));
+          try {
+            await playSongs(songs.map(song => song.id));
+            console.log('[Player] playSongs 호출 성공');
+          } catch (playError) {
+            console.error('[Player] playSongs 호출 실패:', playError);
+            elements.status.textContent = '곡 재생 시작 실패 ❌';
+          }
         } else {
           elements.status.textContent = '곡을 찾을 수 없음 ❌';
           if (songListDiv) songListDiv.innerHTML = '';
         }
       } catch (e) {
-        elements.status.textContent = '위치/곡 불러오기 실패 ❌';
-        const songListDiv = document.getElementById('songList');
+        console.error('[Player] 곡 불러오기 실패 (General Error):', e);
+        elements.status.textContent = '곡 불러오기 실패 ❌';
         if (songListDiv) songListDiv.innerHTML = '';
-        console.error('[Player] 곡 불러오기 실패:', e);
-        try {
-          const defaultSongs = await fetchSongs();
-          if (defaultSongs && defaultSongs.length > 0) {
-            await playSongs(defaultSongs.map(song => song.id));
-            elements.status.textContent = '기본 곡 로드됨 🎵';
-          }
-        } catch (e2) { console.error('[Player] 기본 곡도 실패:', e2); }
       } finally {
         elements.loadSongs.innerHTML = originalHTML;
         elements.loadSongs.disabled = false;
@@ -308,8 +347,10 @@ if (window.location.pathname === "/" || window.location.pathname === "/index.htm
 
 // 위치 정보 가져오기 함수
 function getCurrentLocation() {
+  console.log('[Geolocation] 위치 정보 가져오기 시도...');
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
+      console.warn('[Geolocation] Geolocation API 지원되지 않음');
       reject(new Error('Geolocation is not supported'));
       return;
     }
@@ -317,9 +358,11 @@ function getCurrentLocation() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
+        console.log('[Geolocation] 위치 정보 가져오기 성공:', { latitude, longitude });
         resolve({ latitude, longitude });
       },
       (error) => {
+        console.error('[Geolocation] 위치 정보 가져오기 실패:', error);
         reject(error);
       },
       {
@@ -332,19 +375,45 @@ function getCurrentLocation() {
 }
 
 async function fetchSongsWithLocation(location) {
-  const response = await fetch('/songs', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ latitude: location.latitude, longitude: location.longitude })
-  });
-  if (!response.ok) throw new Error('API 오류');
-  return await response.json();
+  try {
+    const response = await fetch('/songs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude: location.latitude, longitude: location.longitude })
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[fetchSongsWithLocation] API 오류 응답 텍스트:', errorText);
+      throw new Error(`API 오류: ${response.status} - ${errorText}`);
+    }
+    const responseText = await response.text();
+    console.log('[fetchSongsWithLocation] Raw API 응답 텍스트:', responseText);
+    const data = JSON.parse(responseText);
+    console.log('[fetchSongsWithLocation] API 응답 객체:', data);
+    return data;
+  } catch (e) {
+    console.error('[fetchSongsWithLocation] 오류:', e);
+    throw e; // Re-throw the error to be caught by the main handler
+  }
 }
 
 async function fetchSongs() {
-  const response = await fetch('/songs');
-  if (!response.ok) throw new Error('Failed to fetch songs');
-  return await response.json();
+  try {
+    const response = await fetch('/songs');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[fetchSongs] API 오류 응답 텍스트:', errorText);
+      throw new Error(`API 오류: ${response.status} - ${errorText}`);
+    }
+    const responseText = await response.text();
+    console.log('[fetchSongs] Raw API 응답 텍스트:', responseText);
+    const data = JSON.parse(responseText);
+    console.log('[fetchSongs] API 응답 객체:', data);
+    return data;
+  } catch (e) {
+    console.error('[fetchSongs] 오류:', e);
+    throw e; // Re-throw the error to be caught by the main handler
+  }
 }
 
 async function playSongs(songs) {
@@ -367,11 +436,13 @@ async function playSongs(songs) {
     if (!response.ok) {
       const errText = await response.text();
       console.error('[playSongs] Failed to play songs:', response.status, errText);
+      throw new Error(`Spotify Playback API 오류: ${response.status} - ${errText}`);
     } else {
       console.log('[playSongs] 재생 성공!');
     }
   } catch (e) {
     console.error('[playSongs] Error:', e);
+    throw e; // Re-throw the error to be caught by the main handler
   }
 }
 
