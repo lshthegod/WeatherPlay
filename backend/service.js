@@ -2,6 +2,7 @@ const request = require("request");
 const { parseString } = require("xml2js");
 const dotenv = require("dotenv");
 const axios = require("axios");
+const querystring = require("querystring");
 
 // v1 : 경도 v2 : 위도
 function dfs_xy_conv(v1, v2) {
@@ -70,16 +71,20 @@ function getWeather(nx, ny) {
   )}`;
   const base_time = `${pad(now.getHours())}00`;
 
+  const { nx: busanNx, ny: busanNy } = dfs_xy_conv(129.0756, 35.1796);
+
   // 쿼리스트링 조합
   const qs = [
     `serviceKey=${encodeURIComponent(serviceKey)}`,
-    "pageNo=1",
+    "pageNo=1", 
     "numOfRows=1000",
     "dataType=XML",
     `base_date=${base_date}`,
     `base_time=${base_time}`,
     `nx=${nx}`,
     `ny=${ny}`,
+    `nx=${busanNx}`,
+    `ny=${busanNy}`,
   ].join("&");
 
   return new Promise((resolve, reject) => {
@@ -148,9 +153,11 @@ function getWeatherMood(weatherData) {
   else if (skyVal >= 9 && skyVal <= 10) skyMood = "overcast";
 
   // 최종 반환 조건
-  if (rainMood) return rainMood;
-  if (skyMood === "clear") return timeMood;
-  return skyMood;
+  // if (rainMood) return rainMood;
+  // if (skyMood === "clear") return timeMood;
+  // return skyMood;
+
+  return "stormy"
 }
 
 function getSongs(weather) {
@@ -210,7 +217,7 @@ async function getAccessToken() {
 }
 
 async function getTrackId(songInfo) {
-  const query = `track:${songInfo.name} artist:${songInfo.artist}`;
+  const query = `${songInfo.name} ${songInfo.artist}`;
   const encodedQuery = encodeURIComponent(query);
   const accessToken = await getAccessToken();
   const url = `https://api.spotify.com/v1/search?q=${encodedQuery}&type=track&limit=1`;
@@ -236,50 +243,61 @@ async function getTrackId(songInfo) {
 
 async function getTrackIds(selectedSongs) {
   const ids = [];
+  const failedSongs = [];
+  
   for (const song of selectedSongs) {
     try {
       const id = await getTrackId(song);
-      ids.push(id);
+      if (id) {
+        ids.push(id);
+      } else {
+        failedSongs.push(song);
+      }
     } catch (err) {
       console.error(`ID 가져오기 실패: ${song.name} by ${song.artist}`);
+      failedSongs.push(song);
     }
+  }
+
+  if (failedSongs.length > 0) {
+    console.warn(`${failedSongs.length}개의 곡에서 ID를 가져오지 못했습니다.`);
   }
 
   return ids;
 }
 
 async function mainService(x = 126.978, y = 37.5665) {
-  const { nx, ny } = dfs_xy_conv(x, y);
-  const weatherData = await getWeather(nx, ny);
-  const weather = getWeatherMood(weatherData);
-  const data = await getSongs(weather);
-  const songs = songsInfo(data);
-  const IDs = await getTrackIds(songs);
-  console.log("IDs 가져오기 성공");
-  return IDs;
-
-  /*   // 날씨 테스트
-  const { nx, ny } = dfs_xy_conv(126.978, 37.5665);
-  const weatherData = await getWeather(nx, ny);
-  console.log(weatherData);
-  const weather = getWeatherMood(weatherData);
-  console.log(weather);
-
-  // 음악 테스트
-  const data = await getSongs(weather);
-  const songs = songsInfo(data);
-  console.log(songs);
-
-  // spotify access token
-  const token = await getAccessToken();
-  console.log(token);
-
-  // ID 테스트
-  const ID = await getTrackId(songs[0]);
-  console.log(`https://open.spotify.com/track/${ID}`);
-
-  const IDs = await getTrackIds(data);
-  console.log(IDs); */
+  try {
+    const { nx, ny } = dfs_xy_conv(x, y);
+    const weatherData = await getWeather(nx, ny);
+    const weather = getWeatherMood(weatherData);
+    const data = await getSongs(weather);
+    const songs = songsInfo(data);
+    
+    if (!songs || songs.length === 0) {
+      throw new Error('No songs found for the weather condition');
+    }
+    
+    const IDs = await getTrackIds(songs);
+    
+    if (IDs.length === 0) {
+      throw new Error('Failed to get any track IDs');
+    }
+    
+    console.log(`${IDs.length}개의 곡 ID를 성공적으로 가져왔습니다.`);
+    
+    // songs와 IDs를 합쳐서 [{id, name, artist}] 형태로 반환
+    const result = IDs.map((id, idx) => ({
+      id,
+      name: songs[idx]?.name || 'Unknown Track',
+      artist: songs[idx]?.artist || 'Unknown Artist'
+    }));
+    
+    return result;
+  } catch (error) {
+    console.error('Error in mainService:', error);
+    throw error;
+  }
 }
 
 // mainService();
