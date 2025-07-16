@@ -58,8 +58,7 @@ function dfs_xy_conv(v1, v2) {
  * 객체를 resolve 하는 Promise 반환
  */
 function getWeather(nx, ny) {
-  const serviceKey =
-    "wF1nqBiOKCfKIZKN2WIzmkzciFINwicZn0HarDmxpFogEIo7x2y8NM6F+W0wNDnLcWP4hRZi/tVS3P1u0kSWzA==";
+  const serviceKey = process.env.SERVICE_KEY;
   const url =
     "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst";
 
